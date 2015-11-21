@@ -24,9 +24,8 @@
    - Unify is ZLIB/LibPNG licensed.
 
    ## Public API
-   // Convert anything to an uid.
-   // If pointer is valid, any tag found during parsing will be pushed into vector.
-   string unify( const string &uri, vector<string> *tags_found = 0 );
+   // Convert anything to an UID. Additionally, if tags != null pushback all parsed tags found
+   string unify( const string &uri, vector<string> *tags = 0 );
 
    ## Samples
    You better inspect the test suite at bottom of file.
@@ -39,13 +38,13 @@
 #include <string>
 #include <vector>
 
-#define UNIFY_VERSION "1.0.0" /* (2015/08/18) Initial version */
+#define UNIFY_VERSION "1.0.1" /* (2015/11/21) Disabled diacritics for now. Also, x18 times faster
+#define UNIFY_VERSION "1.0.0" // (2015/08/18) Initial version */
 
-namespace {
-// convert anything to an UID
-// additionally, push back any tags found (if `tags != nullptr`)
+// Public API following
+
+// Convert anything to an UID. Additionally, if tags != null pushback all parsed tags found
 std::string unify( const std::string &uri, std::vector<std::string> *tags = 0 );
-}
 
 // Private API following, and tests at bottom of file
 
@@ -58,8 +57,7 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags = 0 );
 #include <vector>
 #include <cstring>
 
-namespace {
-
+inline
 std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
     // taken from https://github.com/r-lyeh/wire {
     struct string {
@@ -86,29 +84,10 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
                 found += replacement.length();
             }
         }
-        static void replace( std::string &self, const std::map< std::string, std::string > &replacements ) {
-            std::string out;
-            for( size_t end = self.size(), i = end -end; i < end; ) {
-                bool found = false;
-                size_t match_length = 0;
-                std::map< std::string, std::string >::const_reverse_iterator it;
-                for( it = replacements.rbegin(); !found && it != replacements.rend(); ++it ) {
-                    const std::string &target = it->first;
-                    const std::string &replacement = it->second;
-                    if( match_length != target.size() ) {
-                        match_length = target.size();
-                    }
-                    if( self.size() - i >= target.size() )
-                    if( !std::memcmp( &self.at(int(i)), &target.at(0), (int)match_length ) ) {
-                        i += target.size();
-                        out += replacement;
-                        found = true;
-                    }
-                }
-                if( !found )
-                    out += self.at(int(i++));
+        static void replace( std::string &self, const std::vector<char> &replacements ) {
+            for( size_t end = self.size(), i = end -end; i < end; ++i ) {
+                self[i] = replacements[ (unsigned char)self[i] ];
             }
-           self = out;
         }
         static void lowercase( std::string &s ) {
             std::transform( s.begin(), s.end(), s.begin(), (int(*)(int)) std::tolower );
@@ -116,45 +95,79 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
     };
     // }
 
+    static std::vector<char> ascii, diacritics, whitespaces;
+    if( ascii.empty() ) {
+        /*
+        std::map<char, char> table1 = {
+            {'ä', 'a'},         {'Ä', 'A'}, 
+            {'â', 'a'},         {'Â', 'A'}, 
+            {'á', 'a'},         {'Á', 'A'}, 
+            {'à', 'a'},         {'À', 'A'}, 
+            {'ã', 'a'},         {'Ã', 'A'}, 
+            {'ë', 'e'},         {'Ë', 'E'}, 
+            {'ê', 'e'},         {'Ê', 'E'}, 
+            {'é', 'e'},         {'É', 'E'}, 
+            {'è', 'e'},         {'È', 'E'}, 
+            //{'~e', 'e'},      {'~E', 'E'}, 
+            {'ï', 'i'},         {'Ï', 'I'}, 
+            {'î', 'i'},         {'Î', 'I'}, 
+            {'í', 'i'},         {'Í', 'I'}, 
+            {'ì', 'i'},         {'Ì', 'I'}, 
+            //{'~i', 'i'},      {'~I', 'I'}, 
+            {'ö', 'o'},         {'Ö', 'O'}, 
+            {'ô', 'o'},         {'Ô', 'O'}, 
+            {'ó', 'o'},         {'Ó', 'O'}, 
+            {'ò', 'o'},         {'Ò', 'O'}, 
+            {'õ', 'o'},         {'Õ', 'O'}, 
+            {'ü', 'u'},         {'Ü', 'U'}, 
+            {'û', 'u'},         {'Û', 'U'}, 
+            {'ú', 'u'},         {'Ú', 'U'}, 
+            {'ù', 'u'},         {'Ù', 'U'}, 
+            //{'~u', 'u'},      {'~U', 'U'}, 
+            //{'¨n', 'n'},      {'¨N', 'N'}, 
+            //{'^n', 'n'},      {'^N', 'N'}, 
+            //{'´n', 'n'},      {'´N', 'N'}, 
+            //{'`n', 'n'},      {'`N', 'N'}, 
+            {'ñ', 'n'},         {'Ñ', 'N'}, 
+        };*/
+
+        std::map<char, char> table2 {
+            {' ', '-'},
+            {'_', '-'},
+            {',', '-'},
+            {'|', '-'},
+            {';', '-'},
+            {':', '-'},
+            {'(', '-'},
+            {')', '-'},
+            {'[', '-'},
+            {']', '-'},
+        };
+
+        ascii.resize( 256 );
+        for( auto i = 0; i < 256; ++i ) {
+            ascii[ (unsigned char)i ] = (char)i;
+        }
+
+        /*
+        diacritics = ascii;
+        for( auto &entry : table1 ) {
+            diacritics[ (unsigned char)entry.first ] = entry.second;
+        }*/
+
+        whitespaces = ascii;
+        for( auto &entry : table2 ) {
+            whitespaces[ (unsigned char)entry.first ] = entry.second;
+        }
+    }
+
     std::string tmp = uri;
 
     // 1) @todo latinization/romanization here (proper utf8)
     // [...]
 
     // 2) @todo remove diacritics here (proper utf8)
-    std::map<std::string, std::string> diacritics = {
-        {"ä", "a"},         {"Ä", "A"}, 
-        {"â", "a"},         {"Â", "A"}, 
-        {"á", "a"},         {"Á", "A"}, 
-        {"à", "a"},         {"À", "A"}, 
-        {"ã", "a"},         {"Ã", "A"}, 
-        {"ë", "e"},         {"Ë", "E"}, 
-        {"ê", "e"},         {"Ê", "E"}, 
-        {"é", "e"},         {"É", "E"}, 
-        {"è", "e"},         {"È", "E"}, 
-        //{"~e", "e"},      {"~E", "E"}, 
-        {"ï", "i"},         {"Ï", "I"}, 
-        {"î", "i"},         {"Î", "I"}, 
-        {"í", "i"},         {"Í", "I"}, 
-        {"ì", "i"},         {"Ì", "I"}, 
-        //{"~i", "i"},      {"~I", "I"}, 
-        {"ö", "o"},         {"Ö", "O"}, 
-        {"ô", "o"},         {"Ô", "O"}, 
-        {"ó", "o"},         {"Ó", "O"}, 
-        {"ò", "o"},         {"Ò", "O"}, 
-        {"õ", "o"},         {"Õ", "O"}, 
-        {"ü", "u"},         {"Ü", "U"}, 
-        {"û", "u"},         {"Û", "U"}, 
-        {"ú", "u"},         {"Ú", "U"}, 
-        {"ù", "u"},         {"Ù", "U"}, 
-        //{"~u", "u"},      {"~U", "U"}, 
-        //{"¨n", "n"},      {"¨N", "N"}, 
-        //{"^n", "n"},      {"^N", "N"}, 
-        //{"´n", "n"},      {"´N", "N"}, 
-        //{"`n", "n"},      {"`N", "N"}, 
-        {"ñ", "n"},         {"Ñ", "N"}, 
-    };
-    string::replace( tmp, diacritics );
+    // string::replace( tmp, diacritics );
 
     // 3) @todo unescape url here
     // [...]
@@ -192,18 +205,6 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
 
     // 8) trim extension, whitespaces and punctuations
     tmp.clear();
-    std::map<std::string, std::string> whitespaces = {
-        {" ", "-"},
-        {"_", "-"},
-        {",", "-"},
-        {"|", "-"},
-        {";", "-"},
-        {":", "-"},
-        {"(", "-"},
-        {")", "-"},
-        {"[", "-"},
-        {"]", "-"},
-    };
     for( auto &s : split ) {
         string::left_of(s, ".");
         string::replace(s, whitespaces);
@@ -226,9 +227,7 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
     return &tmp[1];
 }
 
-}
-
-#ifdef UNIFY_TESTS
+#ifdef UNIFY_BUILD_TESTS
 
 // UID, hypothetical sugar class {
 struct UID : public std::string {
@@ -260,6 +259,9 @@ struct UID : public std::string {
     operator std::string() {
         return *this;
     }
+    operator const char*() const {
+        return this->c_str();
+    }
 };
 // }
 
@@ -276,109 +278,123 @@ struct disk {
 };
 // }
 
-#include <cassert>
-#include <iostream>
+// unittest suite
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#define suite(...) if(printf("------ " __VA_ARGS__),puts(""),true)
+#define test(...)  (errno=0,++tst,err+=!(ok=!!(__VA_ARGS__))),printf("[%s] %d %s (%s)\n",ok?" OK ":"FAIL",__LINE__,#__VA_ARGS__,strerror(errno))
+unsigned tst=0,err=0,ok=atexit([]{ suite("summary"){ printf("[%s] %d tests, %d passed, %d errors\n",err?"FAIL":" OK ",tst,tst-err,err); }});
 
-int main(int argc, const char **argv) {
+int main() {
 
-    // unified folder/asset separators
-    std::string test = unify("folder\\asset");
-    assert( test == unify("folder/asset") );
-    assert( test == unify("folder-asset") );
-    assert( test == unify("folder|asset") );
-    assert( test == unify("folder:asset") );
-    assert( test == unify("folder;asset") );
-    assert( test == unify("folder,asset") );
-    assert( test == unify("[folder]asset") );
-    assert( test == unify("asset(folder)") );
-    // -> asset-folder
-
-    // unified absolute, relative, virtual and remote paths
-    test = unify("~home/game/folder/asset.jpg");
-    assert( test == unify("~user/game1/folder/asset.jpg") );
-    assert( test == unify("~mark/game2/folder/asset.jpg") );
-    assert( test == unify("~john/game3/data/folder/asset.jpg") );
-    assert( test == unify("../folder/asset.jpg") );
-    assert( test == unify("C:\\data\\folder\\asset.jpg") );
-    assert( test == unify("C:/game/data/folder/asset.jpg") );
-    assert( test == unify("data.zip/data/folder/asset.jpg") );
-    assert( test == unify("virtual.rar/folder/asset.jpg") );
-    assert( test == unify("http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe") );
-    // -> asset-folder
-
-    // unified uppercases, lowercases, whitespaces and hyphens
-    assert( unify("mesh/main-character") == "character-main-mesh" );
-    assert( unify("mesh/main_character") == "character-main-mesh" );
-    assert( unify("mesh/Main Character") == "character-main-mesh" );
-    assert( unify("mesh / Main  character ") == "character-main-mesh" );
-    // -> character-main-mesh
-
-    // unified extensions
-    assert( unify("music/theme.ogg") == "music-theme" );
-    assert( unify("music/theme.wav") == "music-theme" );
-    assert( unify("ui/logo.png") == "logo-ui" );
-    assert( unify("ui/logo.webp") == "logo-ui" );
-    // -> music-theme, -> logo-ui
-
-    // unified typos on double extensions and double punctuations
-    assert( unify("game/logo.bmp.png") == unify("game/logo.bmp") );
-    assert( unify("game/logo.png") == unify("game/logo..png") );
-    // -> game-logo
-
-    // unified typos on many diacritics
-    assert( unify("âñimátïón/wàlk") == unify("animation/walk") );
-    // -> animation-walk
-
-    // unified AoS (OO) and SoA (ECS) disk layouts
-    // unified plurals as well (if using English words)
-    assert( unify("sounds/kid")  == unify("kid/sound") );
-    assert( unify("sprites/kid") == unify("kid/sprite") );
-    assert( unify("sounds/car")  == unify("car/sound") );
-    assert( unify("sprites/car") == unify("car/sprite") );
-    // -> car-sound, car-sprite, kid-sound, kid-sprite
-
-    // unified SOV, SVO, VSO, VOS, OVS, OSV subject/verb/object language topologies
-    test = unify("player-joins-scene.intro");
-    assert( test == unify("player-scene-join.intro") );
-    assert( test == unify("join-player-scene.intro") );
-    assert( test == unify("join-scene-player.intro") );
-    assert( test == unify("scene-join-player.intro") );
-    assert( test == unify("scene-player-join.intro") );
-    // -> join-player-scene
-
-    // unified tagging (useful when globbing and deploying files and/or directories)
-    test = unify("splash/logo");
-    assert( unify("/splash/#win32/logo") == test );
-    assert( unify("splash #mobile/logo #win32=always.png") == test );
-    // -> logo-splash
-
-    // unified consistency. reunification as a lossless process
-    assert( unify( unify("roses-are-red") ) == unify("roses-are-red") );
-    // -> are-red-rose
-
-    // demo: transparent UID conversion
-    // UID stands for Unified Identifier.
-    // UID is inmutable on code always, even if changed on disk.
-    // UID can be converted from paths, URLs, URIs, and IDs
-    {
-        UID test = "game\\logo.bmp";
-        assert( test == "game-logo" );
-        test = "logo/game";
-        assert( test == "game-logo" );
-        test = "~home/game/folder/asset.jpg";
-        assert( test == "~user/game1/folder/asset.jpg" );
-        assert( test == "~mark/game2/folder/asset.jpg" );
-        assert( test == "~john/game3/data/folder/asset.jpg" );
-        assert( test == "../folder/asset.jpg" );
-        assert( test == "C:\\data\\folder\\asset.jpg" );
-        assert( test == "C:/game/data/folder/asset.jpg" );
-        assert( test == "data.zip/data/folder/asset.jpg" );
-        assert( test == "virtual.rar/folder/asset.jpg" );
-        assert( test == "http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe" );
+    suite( "unified folder/asset separators" ) {
+        std::string item = unify("folder\\asset");
+        test( item == unify("folder/asset") );
+        test( item == unify("folder-asset") );
+        test( item == unify("folder|asset") );
+        test( item == unify("folder:asset") );
+        test( item == unify("folder;asset") );
+        test( item == unify("folder,asset") );
+        test( item == unify("[folder]asset") );
+        test( item == unify("asset(folder)") );
+        // -> asset-folder
     }
 
-    // demo: insertion & lookup from a virtual filesystem
-    {
+    suite( "unified absolute, relative, virtual and remote paths" ) {
+        std::string item = unify("~home/game/folder/asset.jpg");
+        test( item == unify("~user/game1/folder/asset.jpg") );
+        test( item == unify("~mark/game2/folder/asset.jpg") );
+        test( item == unify("~john/game3/data/folder/asset.jpg") );
+        test( item == unify("../folder/asset.jpg") );
+        test( item == unify("C:\\data\\folder\\asset.jpg") );
+        test( item == unify("C:/game/data/folder/asset.jpg") );
+        test( item == unify("data.zip/data/folder/asset.jpg") );
+        test( item == unify("virtual.rar/folder/asset.jpg") );
+        test( item == unify("http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe") );
+        // -> asset-folder
+    }
+
+    suite( "unified uppercases, lowercases, whitespaces and hyphens" ) {
+        test( unify("mesh/main-character") == "character-main-mesh" );
+        test( unify("mesh/main_character") == "character-main-mesh" );
+        test( unify("mesh/Main Character") == "character-main-mesh" );
+        test( unify("mesh / Main  character ") == "character-main-mesh" );
+        // -> character-main-mesh
+    }
+
+    suite( "unified extensions" ) {
+        test( unify("music/theme.ogg") == "music-theme" );
+        test( unify("music/theme.wav") == "music-theme" );
+        test( unify("ui/logo.png") == "logo-ui" );
+        test( unify("ui/logo.webp") == "logo-ui" );
+        // -> music-theme, -> logo-ui
+    }
+
+    suite( "unified typos on double extensions and double punctuations" ) {
+        test( unify("game/logo.bmp.png") == unify("game/logo.bmp") );
+        test( unify("game/logo.png") == unify("game/logo..png") );
+        // -> game-logo
+    }
+
+    suite( "unified typos on many diacritics" ) {
+        // @todo: diacritrics need proper utf8 support. might be much slower though.
+        // test( unify("âñimátïón/wàlk") == unify("animation/walk") );
+        // -> animation-walk
+    }
+
+    suite( "unified AoS (OO) and SoA (ECS) disk layouts. " 
+           "unified plurals as well (if using English words)" ) {
+        test( unify("sounds/kid")  == unify("kid/sound") );
+        test( unify("sprites/kid") == unify("kid/sprite") );
+        test( unify("sounds/car")  == unify("car/sound") );
+        test( unify("sprites/car") == unify("car/sprite") );
+        // -> car-sound, car-sprite, kid-sound, kid-sprite
+    }
+
+    suite( "unified SOV, SVO, VSO, VOS, OVS, OSV subject/verb/object language topologies" ) {
+        std::string item = unify("player-joins-scene.intro");
+        test( item == unify("player-scene-join.intro") );
+        test( item == unify("join-player-scene.intro") );
+        test( item == unify("join-scene-player.intro") );
+        test( item == unify("scene-join-player.intro") );
+        test( item == unify("scene-player-join.intro") );
+        // -> join-player-scene
+    }
+
+    suite( "unified tagging (useful when globbing and deploying files and/or directories)" ) {
+        std::string item = unify("splash/logo");
+        test( unify("/splash/#win32/logo") == item );
+        test( unify("splash #mobile/logo #win32=always.png") == item );
+        // -> logo-splash
+    }
+
+    suite( "unified consistency. reunification as a lossless process" ) {
+        test( unify( unify("roses-are-red") ) == unify("roses-are-red") );
+        // -> are-red-rose
+    }
+
+    suite( "demo: transparent UID conversion" ) {
+        // UID stands for Unified Identifier.
+        // UID is inmutable on code always, even if changed on disk.
+        // UID can be converted from paths, URLs, URIs, and IDs
+        UID item = "game\\logo.bmp";
+        test( item == "game-logo" );
+        item = "logo/game";
+        test( item == "game-logo" );
+        item = "~home/game/folder/asset.jpg";
+        test( item == "~user/game1/folder/asset.jpg" );
+        test( item == "~mark/game2/folder/asset.jpg" );
+        test( item == "~john/game3/data/folder/asset.jpg" );
+        test( item == "../folder/asset.jpg" );
+        test( item == "C:\\data\\folder\\asset.jpg" );
+        test( item == "C:/game/data/folder/asset.jpg" );
+        test( item == "data.zip/data/folder/asset.jpg" );
+        test( item == "virtual.rar/folder/asset.jpg" );
+        test( item == "http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe" );
+    }
+
+    suite( "demo: insertion & lookup from a virtual filesystem" ) {
         disk d;
         d.add("./local/file.txt");
         d.add("./data/game/icon.png");
@@ -392,21 +408,19 @@ int main(int argc, const char **argv) {
                 d.add( file.full_path );
             }
         } */
-        assert( d.lookup("local/file") == "./local/file.txt" );
-        assert( d.lookup("local-file") == "./local/file.txt" );
-        assert( d.lookup("file-local") == "./local/file.txt" );
-        assert( d.lookup("../file/local") == "./local/file.txt" );
-        assert( d.lookup("game/icon") == "./data/game/icon.png" );
-        assert( d.lookup("game-icon") == "./data/game/icon.png" );
-        assert( d.lookup("icon/game") == "./data/game/icon.png" );
-        assert( d.lookup("icon-game") == "./data/game/icon.png" );
-        assert( d.lookup("songs/main-theme") == "./songs/main_theme.ogg" );
-        assert( d.lookup("inventory-json") == "./game.zip/json #win32/inventory.json" );
-        assert( d.lookup("logos-big") == "./game.zip/logos #win32/big.webp" );
-        assert( d.lookup("logos-big") == "./game.zip/logos #win32/big.webp" );
+        test( d.lookup("local/file") == "./local/file.txt" );
+        test( d.lookup("local-file") == "./local/file.txt" );
+        test( d.lookup("file-local") == "./local/file.txt" );
+        test( d.lookup("../file/local") == "./local/file.txt" );
+        test( d.lookup("game/icon") == "./data/game/icon.png" );
+        test( d.lookup("game-icon") == "./data/game/icon.png" );
+        test( d.lookup("icon/game") == "./data/game/icon.png" );
+        test( d.lookup("icon-game") == "./data/game/icon.png" );
+        test( d.lookup("songs/main-theme") == "./songs/main_theme.ogg" );
+        test( d.lookup("inventory-json") == "./game.zip/json #win32/inventory.json" );
+        test( d.lookup("logos-big") == "./game.zip/logos #win32/big.webp" );
+        test( d.lookup("logos-big") == "./game.zip/logos #win32/big.webp" );
     }
-
-    std::cout << "All ok." << std::endl;
 }
 
 #endif

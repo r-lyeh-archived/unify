@@ -22,9 +22,9 @@ Unify transforms any physical resource string to a unified string, called UID (U
 
 ## Public API
 ```c++
-// Convert anything to an uid.
-// If pointer is valid, any tag found during parsing will be pushed into vector.
-string unify( const string &uri, vector<string> *tags_found = 0 );
+// Convert anything to an UID
+// Additionally, if tags != null pushback all parsed tags found
+string unify( const string &uri, vector<string> *tags = 0 );
 ```
 
 ## Quick tutorial TL;DR
@@ -228,5 +228,5 @@ A possible proposal for a family of optional tags for any UID, that would be:
 Note: there are no reserved keywords in **Unify**. Name tags are **application/project/company dependant** and have to be defined in anticipation.
 
 ## Changelog
-- v1.0.0 (2015/08/18)
-  - Initial commit
+- v1.0.1 (2015/11/21): Disabled diacritics for now. Also, x18 times faster
+- v1.0.0 (2015/08/18): Initial commit

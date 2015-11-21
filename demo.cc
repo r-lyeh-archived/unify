@@ -30,10 +30,13 @@ struct UID : public std::string {
     operator std::string() {
         return *this;
     }
+    operator const char*() const {
+        return this->c_str();
+    }
 };
 // }
 
-#include <cassert>
+#include <stdlib.h>
 
 int main() {
     // demo: transparent UID conversion
@@ -41,17 +44,31 @@ int main() {
     // UID is inmutable on code always, even if changed on disk.
     // UID can be converted from paths, URLs, URIs, and IDs
     UID test = "game\\logo.bmp";
-    assert( test == "game-logo" );
+    puts(test);
+    test = "game-logo";
+    puts(test);
     test = "logo/game";
-    assert( test == "game-logo" );
+    puts(test);
+    test = "game-logo";
+    puts(test);
     test = "~home/game/folder/asset.jpg";
-    assert( test == "~user/game1/folder/asset.jpg" );
-    assert( test == "~mark/game2/folder/asset.jpg" );
-    assert( test == "~john/game3/data/folder/asset.jpg" );
-    assert( test == "../folder/asset.jpg" );
-    assert( test == "C:\\data\\folder\\asset.jpg" );
-    assert( test == "C:/game/data/folder/asset.jpg" );
-    assert( test == "data.zip/data/folder/asset.jpg" );
-    assert( test == "virtual.rar/folder/asset.jpg" );
-    assert( test == "http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe" );
+    puts(test);
+    test = "~user/game1/folder/asset.jpg";
+    puts(test);
+    test = "~mark/game2/folder/asset.jpg";
+    puts(test);
+    test = "~john/game3/data/folder/asset.jpg";
+    puts(test);
+    test = "../folder/asset.jpg";
+    puts(test);
+    test = "C:\\data\\folder\\asset.jpg";
+    puts(test);
+    test = "C:/game/data/folder/asset.jpg";
+    puts(test);
+    test = "data.zip/data/folder/asset.jpg";
+    puts(test);
+    test = "virtual.rar/folder/asset.jpg";
+    puts(test);
+    test = "http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe";
+    puts(test);
 }

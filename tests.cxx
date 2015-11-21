@@ -1,2 +1,2 @@
-#define UNIFY_TESTS
+#define UNIFY_BUILD_TESTS
 #include "unify.cpp"
