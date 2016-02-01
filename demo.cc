@@ -45,11 +45,11 @@ int main() {
     // UID can be converted from paths, URLs, URIs, and IDs
     UID test = "game\\logo.bmp";
     puts(test);
-    test = "game-logo";
+    test = "game_logo";
     puts(test);
     test = "logo/game";
     puts(test);
-    test = "game-logo";
+    test = "game_logo";
     puts(test);
     test = "~home/game/folder/asset.jpg";
     puts(test);

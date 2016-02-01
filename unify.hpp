@@ -38,7 +38,8 @@
 #include <string>
 #include <vector>
 
-#define UNIFY_VERSION "1.0.1" /* (2015/11/21) Disabled diacritics for now. Also, x18 times faster
+#define UNIFY_VERSION "2.0.0" /* (2016/02/01) Switch to underscore separator, as oposed to hyphen
+#define UNIFY_VERSION "1.0.1" // (2015/11/21) Disabled diacritics for now. Also, x18 times faster
 #define UNIFY_VERSION "1.0.0" // (2015/08/18) Initial version */
 
 // Public API following
@@ -132,16 +133,16 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
         };*/
 
         std::map<char, char> table2 {
-            {' ', '-'},
-            {'_', '-'},
-            {',', '-'},
-            {'|', '-'},
-            {';', '-'},
-            {':', '-'},
-            {'(', '-'},
-            {')', '-'},
-            {'[', '-'},
-            {']', '-'},
+            {' ', '_'},
+            {'-', '_'},
+            {',', '_'},
+            {'|', '_'},
+            {';', '_'},
+            {':', '_'},
+            {'(', '_'},
+            {')', '_'},
+            {'[', '_'},
+            {']', '_'},
         };
 
         ascii.resize( 256 );
@@ -208,19 +209,19 @@ std::string unify( const std::string &uri, std::vector<std::string> *tags ) {
     for( auto &s : split ) {
         string::left_of(s, ".");
         string::replace(s, whitespaces);
-        tmp = tmp + "-" + s;
+        tmp = tmp + "_" + s;
     }
 
     //  9) split, sort, and join stems
     // 10) fix aos/soa plural
-    split = string::tokenize(tmp, "-");
+    split = string::tokenize(tmp, "_");
     std::sort( split.begin(), split.end() );
     tmp.clear();
     for( auto &s: split ) {
         if( !s.empty() && s.back() == 's' ) {
             s.pop_back();
         }
-        tmp = tmp + "-" + s;
+        tmp = tmp + "_" + s;
     }
 
     // 11) remove lead separator
@@ -292,13 +293,14 @@ int main() {
         std::string item = unify("folder\\asset");
         test( item == unify("folder/asset") );
         test( item == unify("folder-asset") );
+        test( item == unify("folder_asset") );
         test( item == unify("folder|asset") );
         test( item == unify("folder:asset") );
         test( item == unify("folder;asset") );
         test( item == unify("folder,asset") );
         test( item == unify("[folder]asset") );
         test( item == unify("asset(folder)") );
-        // -> asset-folder
+        // -> asset_folder
     }
 
     suite( "unified absolute, relative, virtual and remote paths" ) {
@@ -312,35 +314,35 @@ int main() {
         test( item == unify("data.zip/data/folder/asset.jpg") );
         test( item == unify("virtual.rar/folder/asset.jpg") );
         test( item == unify("http://web.domain.com%20/folder/asset.jpg?blabla=123&abc=123#qwe") );
-        // -> asset-folder
+        // -> asset_folder
     }
 
     suite( "unified uppercases, lowercases, whitespaces and hyphens" ) {
-        test( unify("mesh/main-character") == "character-main-mesh" );
-        test( unify("mesh/main_character") == "character-main-mesh" );
-        test( unify("mesh/Main Character") == "character-main-mesh" );
-        test( unify("mesh / Main  character ") == "character-main-mesh" );
-        // -> character-main-mesh
+        test( unify("mesh/main-character") == "character_main_mesh" );
+        test( unify("mesh/main_character") == "character_main_mesh" );
+        test( unify("mesh/Main Character") == "character_main_mesh" );
+        test( unify("mesh / Main  character ") == "character_main_mesh" );
+        // -> character_main_mesh
     }
 
     suite( "unified extensions" ) {
-        test( unify("music/theme.ogg") == "music-theme" );
-        test( unify("music/theme.wav") == "music-theme" );
-        test( unify("ui/logo.png") == "logo-ui" );
-        test( unify("ui/logo.webp") == "logo-ui" );
-        // -> music-theme, -> logo-ui
+        test( unify("music/theme.ogg") == "music_theme" );
+        test( unify("music/theme.wav") == "music_theme" );
+        test( unify("ui/logo.png") == "logo_ui" );
+        test( unify("ui/logo.webp") == "logo_ui" );
+        // -> music_theme, -> logo_ui
     }
 
     suite( "unified typos on double extensions and double punctuations" ) {
         test( unify("game/logo.bmp.png") == unify("game/logo.bmp") );
         test( unify("game/logo.png") == unify("game/logo..png") );
-        // -> game-logo
+        // -> game_logo
     }
 
     suite( "unified typos on many diacritics" ) {
         // @todo: diacritrics need proper utf8 support. might be much slower though.
         // test( unify("âñimátïón/wàlk") == unify("animation/walk") );
-        // -> animation-walk
+        // -> animation_walk
     }
 
     suite( "unified AoS (OO) and SoA (ECS) disk layouts. " 
@@ -349,7 +351,7 @@ int main() {
         test( unify("sprites/kid") == unify("kid/sprite") );
         test( unify("sounds/car")  == unify("car/sound") );
         test( unify("sprites/car") == unify("car/sprite") );
-        // -> car-sound, car-sprite, kid-sound, kid-sprite
+        // -> car_sound, car_sprite, kid_sound, kid_sprite
     }
 
     suite( "unified SOV, SVO, VSO, VOS, OVS, OSV subject/verb/object language topologies" ) {
@@ -359,19 +361,19 @@ int main() {
         test( item == unify("join-scene-player.intro") );
         test( item == unify("scene-join-player.intro") );
         test( item == unify("scene-player-join.intro") );
-        // -> join-player-scene
+        // -> join_player_scene
     }
 
     suite( "unified tagging (useful when globbing and deploying files and/or directories)" ) {
         std::string item = unify("splash/logo");
         test( unify("/splash/#win32/logo") == item );
         test( unify("splash #mobile/logo #win32=always.png") == item );
-        // -> logo-splash
+        // -> logo_splash
     }
 
     suite( "unified consistency. reunification as a lossless process" ) {
         test( unify( unify("roses-are-red") ) == unify("roses-are-red") );
-        // -> are-red-rose
+        // -> are_red_rose
     }
 
     suite( "demo: transparent UID conversion" ) {
@@ -379,9 +381,9 @@ int main() {
         // UID is inmutable on code always, even if changed on disk.
         // UID can be converted from paths, URLs, URIs, and IDs
         UID item = "game\\logo.bmp";
-        test( item == "game-logo" );
+        test( item == "game_logo" );
         item = "logo/game";
-        test( item == "game-logo" );
+        test( item == "game_logo" );
         item = "~home/game/folder/asset.jpg";
         test( item == "~user/game1/folder/asset.jpg" );
         test( item == "~mark/game2/folder/asset.jpg" );
